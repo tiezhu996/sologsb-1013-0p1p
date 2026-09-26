@@ -354,6 +354,16 @@ kbd {
   box-shadow: 0 0 0 2px rgba(42, 112, 153, .12);
 }
 
+.cue-row.is-parallel-row {
+  background: #fbf7f0;
+  border-top-color: #d8b987;
+}
+
+.cue-row.is-parallel-row.is-selected {
+  border-color: #c39248;
+  box-shadow: 0 0 0 2px rgba(195, 146, 72, .16);
+}
+
 .cue-row.kind-light { border-left-color: #d3a437; }
 .cue-row.kind-sound { border-left-color: #3d85b6; }
 .cue-row.kind-prop { border-left-color: #a85f52; }
@@ -381,6 +391,37 @@ kbd {
 .cue-time small {
   color: #929da8;
   font: 9px Consolas, monospace;
+}
+
+.mode-chip {
+  margin-top: 5px;
+  padding: 2px 8px;
+  border: 1px solid #c6d0d8;
+  border-radius: 99px;
+  color: #5c6d7a;
+  background: #f4f7f9;
+  font-size: 9px;
+  line-height: 1.5;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.mode-chip:hover:not(:disabled) {
+  border-color: #7fa1b6;
+  color: #2f5a74;
+  background: #e7f0f5;
+}
+
+.mode-chip.is-parallel {
+  border-color: #d8ab63;
+  color: #8a5a1c;
+  background: #fbeed7;
+  font-weight: 700;
+}
+
+.mode-chip:disabled {
+  opacity: .55;
+  cursor: default;
 }
 
 .cue-main {

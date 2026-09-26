@@ -87,7 +87,7 @@
           <div class="cue-list">
             {{#each this.cueRows as |cue|}}
               <article
-                class="cue-row kind-{{cue.kindClass}} {{if cue.selected "is-selected"}}"
+                class="cue-row kind-{{cue.kindClass}} {{if cue.selected "is-selected"}} {{if cue.parallel "is-parallel-row"}}"
                 draggable="true"
                 {{on "dragstart" (fn this.startDrag cue.id)}}
                 {{on "dragover" this.allowDrop}}
@@ -98,6 +98,13 @@
                   <span class="drag-dot">⠿</span>
                   <strong>{{cue.start}}</strong>
                   <small>至 {{cue.end}}</small>
+                  <button
+                    type="button"
+                    class="mode-chip {{if cue.parallel "is-parallel"}}"
+                    {{on "click" (fn this.toggleStartMode cue.id)}}
+                    disabled={{unless cue.canStartWith true}}
+                    title={{if cue.canStartWith "点击切换：接上一条 / 与上一条同时开始" "首场第一条提示，从开场开始"}}
+                  >{{cue.startLabel}}</button>
                 </div>
                 <div class="cue-main">
                   <div class="cue-title-line">
@@ -143,6 +150,7 @@
             <PaperSelect @label="提示类型" @options={{this.cueKindOptions}} @selected={{this.draft.kind}} @onChange={{fn this.updateDraft "kind"}} />
             <PaperInput @label="提示标题" @value={{this.draft.title}} @onChange={{fn this.updateDraft "title"}} />
             <PaperInput @label="时长（秒）" @type="number" @value={{this.draft.duration}} @onChange={{fn this.updateDraft "duration"}} />
+            <PaperSelect @label="开始方式" @options={{this.startModeOptions}} @optionLabelPath="label" @selected={{this.draftStartModeOption}} @onChange={{this.selectDraftStartMode}} />
             <PaperSelect @label="负责人" @options={{this.ownerOptions}} @selected={{this.draft.owner}} @onChange={{fn this.updateDraft "owner"}} />
             <PaperInput @label="灯光提示" @textarea={{true}} @passThru={{hash rows=2}} @value={{this.draft.lighting}} @onChange={{fn this.updateDraft "lighting"}} />
             <PaperInput @label="音响提示" @textarea={{true}} @passThru={{hash rows=2}} @value={{this.draft.sound}} @onChange={{fn this.updateDraft "sound"}} />
@@ -162,6 +170,7 @@
             <span class="selected-kind">{{this.selectedCue.kind}}</span>
             <h3>{{this.selectedCue.title}}</h3>
             <dl>
+              <dt>开始方式</dt><dd>{{this.selectedStartModeLabel}}</dd>
               <dt>负责人</dt><dd>{{if this.selectedCue.owner this.selectedCue.owner "缺失"}}</dd>
               <dt>灯光</dt><dd>{{if this.selectedCue.lighting this.selectedCue.lighting "—"}}</dd>
               <dt>音响</dt><dd>{{if this.selectedCue.sound this.selectedCue.sound "—"}}</dd>
