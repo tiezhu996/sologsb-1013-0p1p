@@ -12,6 +12,7 @@ export interface Cue {
   cast: string[];
   notes: string;
   dependsOn: string[];
+  withPrevious: boolean;
   offset: number;
 }
 
@@ -52,6 +53,7 @@ export interface CueDraft {
   cast: string;
   notes: string;
   dependsOn: string;
+  withPrevious: boolean;
 }
 
 export interface CueIssue {

@@ -21,6 +21,7 @@ function cue(id: string, kind: CueKind, title: string, duration: number, owner: 
     cast: [],
     notes: '',
     dependsOn: [],
+    withPrevious: false,
     offset: 0,
     ...extra,
   };
@@ -38,7 +39,7 @@ function initialShow(): ShowData {
       cues: [
         cue('cue-light-1', '灯光', '观众席渐暗 · 面光起', 45, '李岚', { lighting: 'FOH 1 号面光 65%，侧光暖白 40%', notes: '开演铃后 10 秒执行' }),
         cue('cue-actor-1', '演员', '说书人自左台入场', 90, '赵一帆', { cast: ['说书人／周启'], props: ['折扇'], notes: '追光跟随；入场后停留台中' }),
-        cue('cue-sound-1', '音响', '古琴引子淡入', 120, '陈默', { sound: 'Q1 古琴引子，-18dB 淡入 6 秒', dependsOn: ['cue-deleted-old'], notes: '旧版依赖保留用于检查示例' }),
+        cue('cue-sound-1', '音响', '古琴引子淡入', 120, '陈默', { sound: 'Q1 古琴引子，-18dB 淡入 6 秒', dependsOn: ['cue-deleted-old'], withPrevious: true, notes: '与说书人入场同时开始；旧版依赖保留用于检查示例' }),
         cue('cue-prop-1', '道具', '月牙灯升至舞台中线', 75, '孙禾', { props: ['月牙灯'], lighting: '顶排 3 号定点' }),
       ],
     },
@@ -52,6 +53,7 @@ function initialShow(): ShowData {
       cues: [
         cue('cue-stage-2', '舞台', '中景屏风换为朱红', 60, '', { notes: '负责人尚未确认' }),
         cue('cue-actor-2', '演员', '群臣列队入场', 110, '赵一帆', { cast: ['群演 6 人', '侍女 4 人'], props: ['宫灯'] }),
+        cue('cue-prop-2', '道具', '侍女侧台交接宫灯', 40, '孙禾', { props: ['宫灯'], withPrevious: true, notes: '与群臣入场并行，用于同场并行资源检查示例' }),
         cue('cue-light-2', '灯光', '暖金顶光覆盖后区', 80, '李岚', { lighting: '顶光 4、5 号 70%，色温 3200K' }),
       ],
     },
@@ -89,9 +91,20 @@ function loadVersions(): VersionSnapshot[] {
 
 function recalculateScene(scene: Scene): void {
   let elapsed = 0;
-  scene.cues.forEach((item) => {
-    item.offset = elapsed;
-    elapsed += Number(item.duration) || 0;
+  let groupStart = 0;
+  let groupEnd = 0;
+  scene.cues.forEach((item, index) => {
+    const duration = Number(item.duration) || 0;
+    if (index === 0) item.withPrevious = false;
+    if (item.withPrevious) {
+      item.offset = groupStart;
+      groupEnd = Math.max(groupEnd, groupStart + duration);
+    } else {
+      groupStart = elapsed;
+      item.offset = elapsed;
+      groupEnd = elapsed + duration;
+    }
+    elapsed = groupEnd;
   });
 }
 
@@ -188,8 +201,26 @@ export default class CueEditorComponent extends Component {
         }
       });
       const previous = scene.cues[scene.cues.indexOf(item) - 1];
-      if (previous && item.offset < previous.offset + previous.duration) {
+      if (previous && !item.withPrevious && item.offset < previous.offset + previous.duration) {
         issues.push({ id: `overlap-${item.id}`, severity: 'error', title: '同场时间冲突', detail: `「${item.title}」与上一条提示重叠。`, sceneId: scene.id, cueId: item.id });
+      }
+    });
+
+    this.show.scenes.forEach((scene) => {
+      for (let index = 0; index < scene.cues.length; index += 1) {
+        for (let next = index + 1; next < scene.cues.length; next += 1) {
+          const left = scene.cues[index]!;
+          const right = scene.cues[next]!;
+          if (!overlaps(left.offset, left.duration, right.offset, right.duration)) continue;
+          const sharedProps = left.props.filter((value) => right.props.includes(value));
+          const sharedCast = left.cast.filter((value) => right.cast.includes(value));
+          if (sharedProps.length) {
+            issues.push({ id: `parallel-prop-${left.id}-${right.id}`, severity: 'warning', title: '同场并行道具冲突', detail: `「${left.title}」与「${right.title}」在同场同时进行，同时使用：${sharedProps.join('、')}。`, sceneId: scene.id, cueId: right.id });
+          }
+          if (sharedCast.length) {
+            issues.push({ id: `parallel-cast-${left.id}-${right.id}`, severity: 'warning', title: '同场并行演员冲突', detail: `「${left.title}」与「${right.title}」在同场同时进行，同时需要：${sharedCast.join('、')}。`, sceneId: scene.id, cueId: right.id });
+          }
+        }
       }
     });
 
@@ -223,6 +254,11 @@ export default class CueEditorComponent extends Component {
     return this.selectedCue?.cast.join('、') ?? '';
   }
 
+  get selectedIsFirst(): boolean {
+    const scene = this.activeScene;
+    return !!scene && scene.cues[0]?.id === this.selectedCueId;
+  }
+
   get errors(): number {
     return this.issues.filter((issue) => issue.severity === 'error').length;
   }
@@ -234,8 +270,8 @@ export default class CueEditorComponent extends Component {
   get versionDiff(): VersionDiff[] {
     const version = this.compareVersion;
     if (!version) return [];
-    const before = version.data.scenes.flatMap((scene) => scene.cues.map((item) => `${scene.act}/${scene.name} · ${item.title} | ${item.owner || '未指定'} | ${item.duration}s`));
-    const after = this.show.scenes.flatMap((scene) => scene.cues.map((item) => `${scene.act}/${scene.name} · ${item.title} | ${item.owner || '未指定'} | ${item.duration}s`));
+    const before = version.data.scenes.flatMap((scene) => scene.cues.map((item) => `${scene.act}/${scene.name} · ${item.title} | ${item.owner || '未指定'} | ${item.duration}s | ${item.withPrevious ? '与上一条同时' : '依次'}`));
+    const after = this.show.scenes.flatMap((scene) => scene.cues.map((item) => `${scene.act}/${scene.name} · ${item.title} | ${item.owner || '未指定'} | ${item.duration}s | ${item.withPrevious ? '与上一条同时' : '依次'}`));
     return Array.from({ length: Math.max(before.length, after.length) }, (_, index) => ({
       id: `diff-${index}`,
       changed: before[index] !== after[index],
@@ -276,7 +312,7 @@ export default class CueEditorComponent extends Component {
       this.notify('该场次已锁定，请先建立修订');
       return;
     }
-    this.draft = { kind, title: '', duration: 60, owner: '', lighting: '', sound: '', props: '', cast: '', notes: '', dependsOn: '' };
+    this.draft = { kind, title: '', duration: 60, owner: '', lighting: '', sound: '', props: '', cast: '', notes: '', dependsOn: '', withPrevious: false };
   }
 
   @action
@@ -300,6 +336,7 @@ export default class CueEditorComponent extends Component {
       cast: item.cast.join('、'),
       notes: item.notes,
       dependsOn: item.dependsOn.join('、'),
+      withPrevious: item.withPrevious,
     };
   }
 
@@ -327,6 +364,7 @@ export default class CueEditorComponent extends Component {
         cast: draft.cast.split(/[、,，]/).map((value) => value.trim()).filter(Boolean),
         notes: draft.notes,
         dependsOn: draft.dependsOn.split(/[、,，]/).map((value) => value.trim()).filter(Boolean),
+        withPrevious: draft.withPrevious,
         offset: 0,
       };
       const index = scene.cues.findIndex((item) => item.id === saved.id);
@@ -406,6 +444,14 @@ export default class CueEditorComponent extends Component {
       else Object.assign(item, { [field]: value });
       recalculateScene(scene);
     });
+  }
+
+  @action
+  toggleSelectedParallel(): void {
+    const item = this.selectedCue;
+    if (!item || this.selectedIsFirst || this.activeScene?.locked) return;
+    this.updateSelectedField('withPrevious', !item.withPrevious);
+    this.notify(item.withPrevious ? '已改为接着上一条开始' : '已改为与上一条同时开始，整组按最长时长结束');
   }
 
   @action

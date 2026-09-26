@@ -87,7 +87,7 @@
           <div class="cue-list">
             {{#each this.cueRows as |cue|}}
               <article
-                class="cue-row kind-{{cue.kindClass}} {{if cue.selected "is-selected"}}"
+                class="cue-row kind-{{cue.kindClass}} {{if cue.selected "is-selected"}} {{if cue.withPrevious "is-parallel"}}"
                 draggable="true"
                 {{on "dragstart" (fn this.startDrag cue.id)}}
                 {{on "dragover" this.allowDrop}}
@@ -103,6 +103,7 @@
                   <div class="cue-title-line">
                     <span class="cue-index">{{cue.index}}</span>
                     <span class="cue-kind">{{cue.kind}}</span>
+                    {{#if cue.withPrevious}}<span class="parallel-flag" title="与上一条同时开始">并行</span>{{/if}}
                     <h3>{{cue.title}}</h3>
                     {{#if cue.hasIssue}}<span class="issue-flag">检查</span>{{/if}}
                   </div>
@@ -144,6 +145,9 @@
             <PaperInput @label="提示标题" @value={{this.draft.title}} @onChange={{fn this.updateDraft "title"}} />
             <PaperInput @label="时长（秒）" @type="number" @value={{this.draft.duration}} @onChange={{fn this.updateDraft "duration"}} />
             <PaperSelect @label="负责人" @options={{this.ownerOptions}} @selected={{this.draft.owner}} @onChange={{fn this.updateDraft "owner"}} />
+            <PaperCheckbox @value={{this.draft.withPrevious}} @onChange={{fn this.updateDraft "withPrevious"}} class="parallel-checkbox">
+              与上一条提示同时开始（整组按最长时长结束）
+            </PaperCheckbox>
             <PaperInput @label="灯光提示" @textarea={{true}} @passThru={{hash rows=2}} @value={{this.draft.lighting}} @onChange={{fn this.updateDraft "lighting"}} />
             <PaperInput @label="音响提示" @textarea={{true}} @passThru={{hash rows=2}} @value={{this.draft.sound}} @onChange={{fn this.updateDraft "sound"}} />
             <PaperInput @label="道具（顿号分隔）" @value={{this.draft.props}} @onChange={{fn this.updateDraft "props"}} />
@@ -163,6 +167,7 @@
             <h3>{{this.selectedCue.title}}</h3>
             <dl>
               <dt>负责人</dt><dd>{{if this.selectedCue.owner this.selectedCue.owner "缺失"}}</dd>
+              <dt>开始方式</dt><dd>{{if this.selectedCue.withPrevious "与上一条同时开始" "接着上一条开始"}}</dd>
               <dt>灯光</dt><dd>{{if this.selectedCue.lighting this.selectedCue.lighting "—"}}</dd>
               <dt>音响</dt><dd>{{if this.selectedCue.sound this.selectedCue.sound "—"}}</dd>
               <dt>道具</dt><dd>{{if this.selectedCue.props.length this.selectedProps "—"}}</dd>
@@ -171,6 +176,9 @@
             </dl>
             <div class="inspector-actions">
               <PaperButton @onClick={{this.editSelectedCue}} @raised={{true}} @primary={{true}}>编辑提示</PaperButton>
+              {{#unless this.selectedIsFirst}}
+                <PaperButton @onClick={{this.toggleSelectedParallel}}>{{if this.selectedCue.withPrevious "改为接着上一条" "改为与上一条同时"}}</PaperButton>
+              {{/unless}}
               <PaperButton @onClick={{fn this.moveSelected -1}}>上移一条</PaperButton>
               <PaperButton @onClick={{fn this.moveSelected 1}}>下移一条</PaperButton>
             </div>
